@@ -1,7 +1,8 @@
 from flask import Flask,render_template,flash , redirect , url_for , session ,request, logging
 from flask_mysqldb import MySQL
 from wtforms import Form, StringField , TextAreaField , PasswordField ,validators
-from functools import wraps 
+from functools import wraps
+from passlib.hash import pbkdf2_sha256 
 
 
 app=Flask(__name__)
@@ -70,7 +71,7 @@ def register():
         name=form.name.data
         email=form.email.data
         username=form.username.data
-        password=form.password.data
+        password=pbkdf2_sha256.hash(str(form.password.data))
 
         cur = mysql.connection.cursor()
 
@@ -83,6 +84,34 @@ def register():
         return "회원가입 완료 되었습니다."
     return render_template('register.html', form=form)
 
+@app.route('/login', methods=['GET','POST'])
+def login():
+    if request.method == 'POST':
+        username = request.form['username']
+        password_cadidate = request.form['password']
+
+        #create cursor
+        cur = mysql.connection.cursor()
+
+        #get articles 
+        result = cur.execute('SELECT * FROM users WHERE username=%s', [username])
+        print(result)
+
+        if result>0:
+            user = cur.fetchall()
+            password = user[0]['password']
+            
+            if pbkdf2_sha256.verify(password_cadidate, password):
+                print(pbkdf2_sha256.verify(password_cadidate, password))
+
+                return redirect(url_for('articles'))
+            else:
+                return "password not Diened!! "
+        else:
+            return "User isnot founded!!"
+        cur.close()
+        
+    return render_template('login.html')
 @app.route('/add_article', methods=['GET','POST'])
 def add_article():
     form = ArticleForm(request.form)
